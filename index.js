@@ -18,9 +18,9 @@ const PORT = process.env.PORT || 3000;
 
 try {
   execSync('ffmpeg -version');
-  console.log('ffmpeg found');
+  console.log('ffmpeg encontrado');
 } catch (e) {
-  console.error('ffmpeg not found! This app requires ffmpeg installed.');
+  console.error('ffmpeg não encontrado! Instale ffmpeg no sistema.');
   process.exit(1);
 }
 
@@ -31,16 +31,19 @@ if (!fs.existsSync(TMP_FOLDER)) {
 
 async function getTikTokVideoURL(tiktokURL) {
   try {
-    // Resolve redirecionamentos (vm.tiktok ou links com parâmetros)
-    const finalURL = await axios.get(tiktokURL, {
+    // Resolve link final (segue redirects e parâmetros)
+    const resolvedURL = await axios.get(tiktokURL, {
       maxRedirects: 5,
       validateStatus: status => status >= 200 && status < 400,
-    }).then(res => res.request.res.responseUrl || tiktokURL);
+    }).then(res => res.request.res.responseUrl);
 
-    const cleanUrl = finalURL.split('?')[0]; // remove parâmetros da URL
+    if (!resolvedURL) return null;
+
+    const cleanUrl = resolvedURL.split('?')[0];
 
     const apiUrl = `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(cleanUrl)}`;
     const res = await axios.get(apiUrl);
+
     if (res.data && res.data.video && res.data.video[0]) {
       return res.data.video[0].url;
     }
