@@ -31,7 +31,15 @@ if (!fs.existsSync(TMP_FOLDER)) {
 
 async function getTikTokVideoURL(tiktokURL) {
   try {
-    const apiUrl = `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(tiktokURL)}`;
+    // Resolve redirecionamentos (vm.tiktok ou links com parâmetros)
+    const finalURL = await axios.get(tiktokURL, {
+      maxRedirects: 5,
+      validateStatus: status => status >= 200 && status < 400,
+    }).then(res => res.request.res.responseUrl || tiktokURL);
+
+    const cleanUrl = finalURL.split('?')[0]; // remove parâmetros da URL
+
+    const apiUrl = `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(cleanUrl)}`;
     const res = await axios.get(apiUrl);
     if (res.data && res.data.video && res.data.video[0]) {
       return res.data.video[0].url;
@@ -77,12 +85,8 @@ app.post('/download', async (req, res) => {
         .noVideo()
         .audioBitrate(128)
         .save(audioPath)
-        .on('end', () => {
-          resolve();
-        })
-        .on('error', (err) => {
-          reject(err);
-        });
+        .on('end', resolve)
+        .on('error', reject);
     });
 
     res.json({
@@ -97,28 +101,20 @@ app.post('/download', async (req, res) => {
 });
 
 app.get('/video/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(TMP_FOLDER, filename);
+  const filePath = path.join(TMP_FOLDER, req.params.filename);
   if (fs.existsSync(filePath)) {
-    res.download(filePath, filename, (err) => {
-      if (err) console.error(err);
-      fs.unlink(filePath, () => {});
-    });
+    res.download(filePath, () => fs.unlink(filePath, () => {}));
   } else {
-    res.status(404).send('Arquivo não encontrado');
+    res.status(404).send('Arquivo de vídeo não encontrado');
   }
 });
 
 app.get('/audio/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(TMP_FOLDER, filename);
+  const filePath = path.join(TMP_FOLDER, req.params.filename);
   if (fs.existsSync(filePath)) {
-    res.download(filePath, filename, (err) => {
-      if (err) console.error(err);
-      fs.unlink(filePath, () => {});
-    });
+    res.download(filePath, () => fs.unlink(filePath, () => {}));
   } else {
-    res.status(404).send('Arquivo não encontrado');
+    res.status(404).send('Arquivo de áudio não encontrado');
   }
 });
 
